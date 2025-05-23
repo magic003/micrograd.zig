@@ -11,4 +11,13 @@ pub const Data = union(enum) {
             else => @compileError("Unsupported data type: " ++ @typeName(T)),
         };
     }
+
+    const testing = @import("std").testing;
+    test init {
+        const data_f32 = Data.init(f32, 10.0);
+        const data_i32 = Data.init(i32, 10);
+
+        try testing.expectEqual(10.0, data_f32.f32);
+        try testing.expectEqual(10, data_i32.i32);
+    }
 };
