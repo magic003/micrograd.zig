@@ -8,9 +8,12 @@ data: Data,
 
 /// Creates a value with the given type and value.
 pub fn init(comptime T: type, value: T) Value {
-    return Value{
-        .data = Data.init(T, value),
+    const data = switch (T) {
+        f32 => Data{ .f32 = value },
+        i32 => Data{ .i32 = value },
+        else => @compileError("Unsupported data type: " ++ @typeName(T)),
     };
+    return .{ .data = data };
 }
 
 const testing = @import("std").testing;
