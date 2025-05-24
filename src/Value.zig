@@ -41,6 +41,7 @@ pub fn add(self: Value, other: Value) Value {
     };
 }
 
+/// Multiplies this value with another value of the same type.
 pub fn mul(self: Value, other: Value) Value {
     if (self.T != other.T) {
         @compileError("Cannot multiply values of different types: " ++ @typeName(self.T) ++ " and " ++ @typeName(other.T));
@@ -52,6 +53,21 @@ pub fn mul(self: Value, other: Value) Value {
         },
         i32 => .{
             .data = Data{ .i32 = self.data.i32 * other.data.i32 },
+            .T = self.T,
+        },
+        else => unreachable,
+    };
+}
+
+/// Applies the ReLU activation function to this value.
+pub fn relu(self: Value) Value {
+    return switch (self.T) {
+        f32 => .{
+            .data = Data{ .f32 = if (self.data.f32 < 0.0) 0.0 else self.data.f32 },
+            .T = self.T,
+        },
+        i32 => .{
+            .data = Data{ .i32 = if (self.data.i32 < 0) 0 else self.data.i32 },
             .T = self.T,
         },
         else => unreachable,
@@ -95,5 +111,17 @@ test mul {
     const value_i32_2 = Value.init(i32, 5);
     const result_i32 = value_i32_1.mul(value_i32_2);
     try testing.expectEqual(50, result_i32.data.i32);
+    try testing.expectEqual(i32, result_i32.T);
+}
+
+test relu {
+    const value_f32 = Value.init(f32, -10.0);
+    const result_f32 = value_f32.relu();
+    try testing.expectEqual(0.0, result_f32.data.f32);
+    try testing.expectEqual(f32, result_f32.T);
+
+    const value_i32 = Value.init(i32, 10);
+    const result_i32 = value_i32.relu();
+    try testing.expectEqual(10, result_i32.data.i32);
     try testing.expectEqual(i32, result_i32.T);
 }
