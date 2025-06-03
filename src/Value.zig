@@ -10,6 +10,8 @@ T: type,
 data: Data,
 /// The operation that produced this value, if any.
 op: ?Op = null,
+/// The gradient of this value, used for backpropagation.
+grad: f32 = 0.0,
 
 /// Creates a value with the given type and value.
 pub fn init(comptime T: type, value: T) Value {
@@ -105,9 +107,11 @@ test init {
     try testing.expectEqual(10.0, value_f32.data.f32);
     try testing.expectEqual(f32, value_f32.T);
     try testing.expectEqual(null, value_f32.op);
+    try testing.expectEqual(0.0, value_f32.grad);
     try testing.expectEqual(10, value_i32.data.i32);
     try testing.expectEqual(i32, value_i32.T);
     try testing.expectEqual(null, value_i32.op);
+    try testing.expectEqual(0.0, value_i32.grad);
 }
 
 test add {
