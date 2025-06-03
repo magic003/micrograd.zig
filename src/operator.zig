@@ -7,6 +7,7 @@ pub const Op = union(enum) {
     sub: Sub,
     mul: Mul,
     div: Div,
+    relu: Relu,
 
     const Add = struct {
         left: *const Value,
@@ -193,6 +194,44 @@ pub const Op = union(enum) {
             try testing.expectEqual(2, result_i32.data.i32);
             try testing.expectEqual(i32, result_i32.T);
             try testing.expectEqual(op2, result_i32.op.?.div);
+        }
+    };
+
+    const Relu = struct {
+        value: *const Value,
+
+        pub fn apply(self: Relu) Value {
+            return switch (self.value.T) {
+                f32 => .{
+                    .data = Data{ .f32 = if (self.value.data.f32 < 0.0) 0.0 else self.value.data.f32 },
+                    .T = f32,
+                    .op = .{ .relu = self },
+                },
+                i32 => .{
+                    .data = Data{ .i32 = if (self.value.data.i32 < 0) 0 else self.value.data.i32 },
+                    .T = i32,
+                    .op = .{ .relu = self },
+                },
+                else => unreachable,
+            };
+        }
+
+        const testing = @import("std").testing;
+
+        test apply {
+            const value_f32 = Value.init(f32, -10.0);
+            const op1 = Relu{ .value = &value_f32 };
+            const result_f32 = op1.apply();
+            try testing.expectEqual(0.0, result_f32.data.f32);
+            try testing.expectEqual(f32, result_f32.T);
+            try testing.expectEqual(op1, result_f32.op.?.relu);
+
+            const value_i32 = Value.init(i32, 10);
+            const op2 = Relu{ .value = &value_i32 };
+            const result_i32 = op2.apply();
+            try testing.expectEqual(10, result_i32.data.i32);
+            try testing.expectEqual(i32, result_i32.T);
+            try testing.expectEqual(op2, result_i32.op.?.relu);
         }
     };
 };
