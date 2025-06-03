@@ -41,6 +41,21 @@ pub fn add(self: Value, other: Value) Value {
     return op.add.apply();
 }
 
+/// Subtracts another value from this value of the same type.
+pub fn sub(self: Value, other: Value) Value {
+    if (self.T != other.T) {
+        @compileError("Cannot subtract values of different types: " ++ @typeName(self.T) ++ " and " ++ @typeName(other.T));
+    }
+
+    const op = Op{
+        .sub = .{
+            .left = &self,
+            .right = &other,
+        },
+    };
+    return op.sub.apply();
+}
+
 /// Multiplies this value with another value of the same type.
 pub fn mul(self: Value, other: Value) Value {
     if (self.T != other.T) {
@@ -54,6 +69,21 @@ pub fn mul(self: Value, other: Value) Value {
         },
     };
     return op.mul.apply();
+}
+
+/// Divides this value by another value of the same type.
+pub fn div(self: Value, other: Value) Value {
+    if (self.T != other.T) {
+        @compileError("Cannot divide values of different types: " ++ @typeName(self.T) ++ " and " ++ @typeName(other.T));
+    }
+
+    const op = Op{
+        .div = .{
+            .left = &self,
+            .right = &other,
+        },
+    };
+    return op.div.apply();
 }
 
 /// Applies the ReLU activation function to this value.
@@ -91,11 +121,27 @@ test add {
     try testing.expectEqual(f32, result_f32.T);
 }
 
+test sub {
+    const value_f32_1 = Value.init(f32, 10.0);
+    const value_f32_2 = Value.init(f32, 5.0);
+    const result_f32 = value_f32_1.sub(value_f32_2);
+    try testing.expectEqual(5.0, result_f32.data.f32);
+    try testing.expectEqual(f32, result_f32.T);
+}
+
 test mul {
     const value_f32_1 = Value.init(f32, 10.0);
     const value_f32_2 = Value.init(f32, 5.0);
     const result_f32 = value_f32_1.mul(value_f32_2);
     try testing.expectEqual(50.0, result_f32.data.f32);
+    try testing.expectEqual(f32, result_f32.T);
+}
+
+test div {
+    const value_f32_1 = Value.init(f32, 10.0);
+    const value_f32_2 = Value.init(f32, 5.0);
+    const result_f32 = value_f32_1.div(value_f32_2);
+    try testing.expectEqual(2.0, result_f32.data.f32);
     try testing.expectEqual(f32, result_f32.T);
 }
 
