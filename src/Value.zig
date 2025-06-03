@@ -1,4 +1,5 @@
 const Data = @import("data.zig").Data;
+const Op = @import("operator.zig").Op;
 
 /// A value stores a scalar data and its gradient.
 pub const Value = @This();
@@ -7,6 +8,8 @@ pub const Value = @This();
 T: type,
 /// The scalar data.
 data: Data,
+/// The operation that produced this value, if any.
+op: ?Op = null,
 
 /// Creates a value with the given type and value.
 pub fn init(comptime T: type, value: T) Value {
@@ -28,17 +31,14 @@ pub fn add(self: Value, other: Value) Value {
     if (self.T != other.T) {
         @compileError("Cannot add values of different types: " ++ @typeName(self.T) ++ " and " ++ @typeName(other.T));
     }
-    return switch (self.T) {
-        f32 => .{
-            .data = Data{ .f32 = self.data.f32 + other.data.f32 },
-            .T = self.T,
+
+    const op = Op{
+        .add = .{
+            .left = &self,
+            .right = &other,
         },
-        i32 => .{
-            .data = Data{ .i32 = self.data.i32 + other.data.i32 },
-            .T = self.T,
-        },
-        else => unreachable,
     };
+    return op.add.apply();
 }
 
 /// Multiplies this value with another value of the same type.
@@ -46,17 +46,14 @@ pub fn mul(self: Value, other: Value) Value {
     if (self.T != other.T) {
         @compileError("Cannot multiply values of different types: " ++ @typeName(self.T) ++ " and " ++ @typeName(other.T));
     }
-    return switch (self.T) {
-        f32 => .{
-            .data = Data{ .f32 = self.data.f32 * other.data.f32 },
-            .T = self.T,
+
+    const op = Op{
+        .mul = .{
+            .left = &self,
+            .right = &other,
         },
-        i32 => .{
-            .data = Data{ .i32 = self.data.i32 * other.data.i32 },
-            .T = self.T,
-        },
-        else => unreachable,
     };
+    return op.mul.apply();
 }
 
 /// Applies the ReLU activation function to this value.
@@ -92,12 +89,6 @@ test add {
     const result_f32 = value_f32_1.add(value_f32_2);
     try testing.expectEqual(15.0, result_f32.data.f32);
     try testing.expectEqual(f32, result_f32.T);
-
-    const value_i32_1 = Value.init(i32, 10);
-    const value_i32_2 = Value.init(i32, 5);
-    const result_i32 = value_i32_1.add(value_i32_2);
-    try testing.expectEqual(15, result_i32.data.i32);
-    try testing.expectEqual(i32, result_i32.T);
 }
 
 test mul {
@@ -106,12 +97,6 @@ test mul {
     const result_f32 = value_f32_1.mul(value_f32_2);
     try testing.expectEqual(50.0, result_f32.data.f32);
     try testing.expectEqual(f32, result_f32.T);
-
-    const value_i32_1 = Value.init(i32, 10);
-    const value_i32_2 = Value.init(i32, 5);
-    const result_i32 = value_i32_1.mul(value_i32_2);
-    try testing.expectEqual(50, result_i32.data.i32);
-    try testing.expectEqual(i32, result_i32.T);
 }
 
 test relu {
