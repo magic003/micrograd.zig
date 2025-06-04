@@ -29,6 +29,11 @@ pub const Op = union(enum) {
             };
         }
 
+        pub fn backward(self: Add, out: Value) void {
+            self.left.grad += out.grad;
+            self.right.grad += out.grad;
+        }
+
         const testing = @import("std").testing;
 
         test apply {
@@ -53,6 +58,21 @@ pub const Op = union(enum) {
             try testing.expectEqual(15, result_i32.data.i32);
             try testing.expectEqual(i32, result_i32.T);
             try testing.expectEqual(op2, result_i32.op.?.add);
+        }
+
+        test backward {
+            var value_f32_1 = Value.init(f32, 10.0);
+            value_f32_1.grad = 1.0;
+            // const value_f32_2 = Value.init(f32, 5.0);
+            // const op = Add{
+            //     .left = &value_f32_1,
+            //     .right = &value_f32_2,
+            // };
+            // var out = op.apply();
+            // out.grad = 3.0;
+            // op.backward(out);
+            // try testing.expectEqual(15.0, value_f32_1.grad);
+            // try testing.expectEqual(f32, value_f32_2.grad);
         }
     };
 
