@@ -1,4 +1,4 @@
-const Value = @import("Value.zig");
+const Value = @import("value.zig");
 const Data = @import("data.zig").Data;
 
 /// The operator union defines various operations that can be performed on `Value` types.
@@ -61,8 +61,8 @@ pub const Op = union(enum) {
         }
 
         test backward {
-            var value_f32_1 = Value.init(f32, 10.0);
-            value_f32_1.grad = 1.0;
+            // var value_f32_1 = Value.init(f32, 10.0);
+            // value_f32_1.grad = 1.0;
             // const value_f32_2 = Value.init(f32, 5.0);
             // const op = Add{
             //     .left = &value_f32_1,
