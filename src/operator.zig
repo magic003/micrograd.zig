@@ -28,7 +28,7 @@ pub fn Op(comptime T: type) type {
                 };
             }
 
-            pub fn backward(self: Add, out: Value(T)) void {
+            pub fn backward(self: Add, out: *const Value(T)) void {
                 self.left.grad += out.grad;
                 self.right.grad += out.grad;
             }
@@ -144,7 +144,7 @@ test "add backward" {
     };
     var out = op.apply();
     out.grad = 3.0;
-    op.backward(out);
+    op.backward(&out);
     try testing.expectEqual(3.0, value_f32_1.grad);
     try testing.expectEqual(3.0, value_f32_2.grad);
 }
