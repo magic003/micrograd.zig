@@ -51,6 +51,11 @@ pub fn Op(comptime T: type) type {
                     else => unreachable,
                 };
             }
+
+            pub fn backward(self: Sub, out: *const Value(T)) void {
+                self.left.grad += out.grad;
+                self.right.grad -= out.grad;
+            }
         };
 
         const Mul = struct {
@@ -69,6 +74,11 @@ pub fn Op(comptime T: type) type {
                     },
                     else => unreachable,
                 };
+            }
+
+            pub fn backward(self: Mul, out: *const Value(T)) void {
+                self.left.grad += self.right.data * out.grad;
+                self.right.grad += self.left.data * out.grad;
             }
         };
 
@@ -89,6 +99,13 @@ pub fn Op(comptime T: type) type {
                     else => unreachable,
                 };
             }
+
+            pub fn backward(self: Div, out: *const Value(T)) void {
+                const left: f32 = @floatFromInt(self.left.data);
+                const right: f32 = @floatFromInt(self.right.data);
+                self.left.grad += out.grad / right;
+                self.right.grad += -1.0 * (left / (right * right)) * out.grad;
+            }
         };
 
         const Relu = struct {
@@ -106,6 +123,12 @@ pub fn Op(comptime T: type) type {
                     },
                     else => unreachable,
                 };
+            }
+
+            pub fn backward(self: Relu, out: *const Value(T)) void {
+                if (self.value.data > 0) {
+                    self.value.grad += out.grad;
+                }
             }
         };
     };
@@ -171,6 +194,20 @@ test "sub apply" {
     try testing.expectEqual(op2, result_i32.op.?.sub);
 }
 
+test "sub backward" {
+    var value_f32_1 = Value(f32).init(10.0);
+    var value_f32_2 = Value(f32).init(5.0);
+    const op = Op(f32).Sub{
+        .left = &value_f32_1,
+        .right = &value_f32_2,
+    };
+    var out = op.apply();
+    out.grad = 3.0;
+    op.backward(&out);
+    try testing.expectEqual(3.0, value_f32_1.grad);
+    try testing.expectEqual(-3.0, value_f32_2.grad);
+}
+
 test "mul apply" {
     var value_f32_1 = Value(f32).init(10.0);
     var value_f32_2 = Value(f32).init(5.0);
@@ -191,6 +228,20 @@ test "mul apply" {
     const result_i32 = op2.apply();
     try testing.expectEqual(50, result_i32.data);
     try testing.expectEqual(op2, result_i32.op.?.mul);
+}
+
+test "mul backward" {
+    var value_f32_1 = Value(f32).init(10.0);
+    var value_f32_2 = Value(f32).init(5.0);
+    const op = Op(f32).Mul{
+        .left = &value_f32_1,
+        .right = &value_f32_2,
+    };
+    var out = op.apply();
+    out.grad = 3.0;
+    op.backward(&out);
+    try testing.expectEqual(15.0, value_f32_1.grad);
+    try testing.expectEqual(30.0, value_f32_2.grad);
 }
 
 test "div apply" {
@@ -215,6 +266,20 @@ test "div apply" {
     try testing.expectEqual(op2, result_i32.op.?.div);
 }
 
+test "div backward" {
+    var value_i32_1 = Value(i32).init(10);
+    var value_i32_2 = Value(i32).init(5);
+    const op = Op(i32).Div{
+        .left = &value_i32_1,
+        .right = &value_i32_2,
+    };
+    var out = op.apply();
+    out.grad = 3.0;
+    op.backward(&out);
+    try testing.expectEqual(0.6, value_i32_1.grad);
+    try testing.expectEqual(-1.2, value_i32_2.grad);
+}
+
 test "relu apply" {
     var value_f32 = Value(f32).init(-10.0);
     const op1 = Op(f32).Relu{ .value = &value_f32 };
@@ -227,4 +292,20 @@ test "relu apply" {
     const result_i32 = op2.apply();
     try testing.expectEqual(10, result_i32.data);
     try testing.expectEqual(op2, result_i32.op.?.relu);
+}
+
+test "relu backward" {
+    var value_f32 = Value(f32).init(-10.0);
+    const op_f32 = Op(f32).Relu{ .value = &value_f32 };
+    var out_f32 = op_f32.apply();
+    out_f32.grad = 3.0;
+    op_f32.backward(&out_f32);
+    try testing.expectEqual(0.0, value_f32.grad);
+
+    var value_i32 = Value(i32).init(10);
+    const op_i32 = Op(i32).Relu{ .value = &value_i32 };
+    var out_i32 = op_i32.apply();
+    out_i32.grad = 3.0;
+    op_i32.backward(&out_i32);
+    try testing.expectEqual(3.0, value_i32.grad);
 }
