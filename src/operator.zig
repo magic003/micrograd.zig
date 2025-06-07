@@ -10,6 +10,24 @@ pub fn Op(comptime T: type) type {
         div: Div,
         relu: Relu,
 
+        pub fn backward(self: *const Op(T), out: *const Value(T)) void {
+            switch (self.*) {
+                .add => |op| op.backward(out),
+                .sub => |op| op.backward(out),
+                .mul => |op| op.backward(out),
+                .div => |op| op.backward(out),
+                .relu => |op| op.backward(out),
+            }
+        }
+
+        fn toFloat(value: T) f32 {
+            return switch (T) {
+                f32 => value,
+                i32 => @floatFromInt(value),
+                else => @compileError("Unsupported data type: " ++ @typeName(T)),
+            };
+        }
+
         const Add = struct {
             left: *Value(T),
             right: *Value(T),
@@ -101,8 +119,8 @@ pub fn Op(comptime T: type) type {
             }
 
             pub fn backward(self: Div, out: *const Value(T)) void {
-                const left: f32 = @floatFromInt(self.left.data);
-                const right: f32 = @floatFromInt(self.right.data);
+                const left: f32 = toFloat(self.left.data);
+                const right: f32 = toFloat(self.right.data);
                 self.left.grad += out.grad / right;
                 self.right.grad += -1.0 * (left / (right * right)) * out.grad;
             }

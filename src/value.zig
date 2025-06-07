@@ -1,3 +1,4 @@
+const std = @import("std");
 const Op = @import("operator.zig").Op;
 
 /// A value stores a scalar data and its gradient.
@@ -76,6 +77,60 @@ pub fn Value(comptime T: type) type {
             };
             return op.relu.apply();
         }
+
+        /// Performs backpropagation to compute gradients.
+        pub fn backword(self: *Value(T)) std.mem.Allocator.Error!void {
+            var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+            defer _ = gpa.deinit();
+            const allocator = gpa.allocator();
+
+            // run topological sort to get the order of backpropagation
+            var visited = std.AutoHashMap(*Value(T), bool).init(allocator);
+            defer visited.deinit();
+            var stack = std.ArrayList(*Value(T)).init(allocator);
+            defer stack.deinit();
+            try self.dfs(&visited, &stack);
+
+            self.grad = 1.0;
+            var len = stack.items.len;
+            while (len > 0) : (len -= 1) {
+                const current = stack.items[len - 1];
+                if (current.op) |op| {
+                    op.backward(current);
+                }
+            }
+        }
+
+        fn dfs(self: *Value(T), visited: *std.AutoHashMap(*Value(T), bool), stack: *std.ArrayList(*Value(T))) std.mem.Allocator.Error!void {
+            if (visited.get(self) orelse false) {
+                return;
+            }
+            try visited.put(self, true);
+            if (self.op) |op| {
+                switch (op) {
+                    .add => |add_op| {
+                        try add_op.left.dfs(visited, stack);
+                        try add_op.right.dfs(visited, stack);
+                    },
+                    .sub => |sub_op| {
+                        try sub_op.left.dfs(visited, stack);
+                        try sub_op.right.dfs(visited, stack);
+                    },
+                    .mul => |mul_op| {
+                        try mul_op.left.dfs(visited, stack);
+                        try mul_op.right.dfs(visited, stack);
+                    },
+                    .div => |div_op| {
+                        try div_op.left.dfs(visited, stack);
+                        try div_op.right.dfs(visited, stack);
+                    },
+                    .relu => |relu_op| {
+                        try relu_op.value.dfs(visited, stack);
+                    },
+                }
+                try stack.append(self);
+            }
+        }
     };
 }
 
@@ -130,4 +185,28 @@ test "value relu" {
     const result_f32 = value_f32.relu();
     try testing.expectEqual(0.0, result_f32.data);
     try testing.expect(result_f32.op != null);
+}
+
+test "value backpropagation" {
+    // This example is taken from Andrej Karpathy's building micrograd video:
+    // https://www.youtube.com/watch?v=VMj-3S1tku0&t=1930s
+    // Expression: l = (a * b + c) * f
+    const Vf32 = Value(f32);
+    var a = Vf32.init(2.0);
+    var b = Vf32.init(-3.0);
+    var e = a.mul(&b);
+    var c = Vf32.init(10.0);
+    var d = e.add(&c);
+    var f = Vf32.init(-2.0);
+    var l = d.mul(&f);
+    try testing.expectEqual(-8.0, l.data);
+
+    try l.backword();
+    try testing.expectEqual(1.0, l.grad);
+    try testing.expectEqual(4.0, f.grad);
+    try testing.expectEqual(-2.0, d.grad);
+    try testing.expectEqual(-2.0, e.grad);
+    try testing.expectEqual(-2.0, c.grad);
+    try testing.expectEqual(-4.0, b.grad);
+    try testing.expectEqual(6.0, a.grad);
 }
