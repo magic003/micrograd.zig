@@ -90,7 +90,7 @@ pub fn Value(comptime T: type) type {
         }
 
         /// Performs backpropagation to compute gradients.
-        pub fn backword(self: *Value(T)) std.mem.Allocator.Error!void {
+        pub fn backward(self: *Value(T)) std.mem.Allocator.Error!void {
             var gpa = std.heap.GeneralPurposeAllocator(.{}){};
             defer _ = gpa.deinit();
             const allocator = gpa.allocator();
@@ -222,7 +222,7 @@ test "value backpropagation" {
     var l = d.mul(&f);
     try testing.expectEqual(-8.0, l.data);
 
-    try l.backword();
+    try l.backward();
     try testing.expectEqual(1.0, l.grad);
     try testing.expectEqual(4.0, f.grad);
     try testing.expectEqual(-2.0, d.grad);

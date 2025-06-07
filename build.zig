@@ -33,7 +33,7 @@ pub fn build(b: *std.Build) void {
     // for actually invoking the compiler.
     const lib = b.addLibrary(.{
         .linkage = .static,
-        .name = "micrograd_zig",
+        .name = "micrograd",
         .root_module = lib_mod,
     });
 
@@ -55,4 +55,28 @@ pub fn build(b: *std.Build) void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
+
+    // Add the run step for examples.
+    const example_opt = b.option([]const u8, "example", "example to run");
+    if (example_opt) |example| {
+        const allocator = std.heap.page_allocator;
+        const path = std.fmt.allocPrint(allocator, "examples/{s}.zig", .{example}) catch "";
+        const exe = b.addExecutable(.{
+            .name = example,
+            .root_source_file = .{ .src_path = .{
+                .owner = b,
+                .sub_path = path,
+            } },
+            .target = target,
+            .optimize = optimize,
+        });
+        exe.root_module.addImport("micrograd", lib_mod);
+        b.installArtifact(exe);
+
+        const run_cmd = b.addRunArtifact(exe);
+        run_cmd.step.dependOn(b.getInstallStep());
+
+        const run_step = b.step("run", "Run the example");
+        run_step.dependOn(&run_cmd.step);
+    }
 }
