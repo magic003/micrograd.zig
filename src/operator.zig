@@ -1,3 +1,4 @@
+const std = @import("std");
 const Value = @import("value.zig").Value;
 
 /// The operator union defines various operations that can be performed
@@ -9,6 +10,7 @@ pub fn Op(comptime T: type) type {
         mul: Mul,
         div: Div,
         relu: Relu,
+        pow: Pow,
 
         pub fn backward(self: *const Op(T), out: *const Value(T)) void {
             switch (self.*) {
@@ -17,6 +19,7 @@ pub fn Op(comptime T: type) type {
                 .mul => |op| op.backward(out),
                 .div => |op| op.backward(out),
                 .relu => |op| op.backward(out),
+                .pow => |op| op.backward(out),
             }
         }
 
@@ -147,6 +150,31 @@ pub fn Op(comptime T: type) type {
                 if (self.value.data > 0) {
                     self.value.grad += out.grad;
                 }
+            }
+        };
+
+        const Pow = struct {
+            base: *Value(T),
+            exponent: T,
+
+            pub fn apply(self: Pow) Value(T) {
+                return switch (T) {
+                    f32 => .{
+                        .data = std.math.pow(f32, self.base.data, self.exponent),
+                        .op = .{ .pow = self },
+                    },
+                    i32 => .{
+                        .data = std.math.powi(i32, self.base.data, self.exponent) catch unreachable,
+                        .op = .{ .pow = self },
+                    },
+                    else => @compileError("Unsupported data type: " ++ @typeName(T)),
+                };
+            }
+
+            pub fn backward(self: Pow, out: *const Value(T)) void {
+                const base = toFloat(self.base.data);
+                const exponent = toFloat(self.exponent);
+                self.base.grad += exponent * std.math.pow(f32, base, exponent - 1) * out.grad;
             }
         };
     };
@@ -326,4 +354,34 @@ test "relu backward" {
     out_i32.grad = 3.0;
     op_i32.backward(&out_i32);
     try testing.expectEqual(3.0, value_i32.grad);
+}
+
+test "pow apply" {
+    var value_f32 = Value(f32).init(2.0);
+    const op_f32 = Op(f32).Pow{ .base = &value_f32, .exponent = 3.0 };
+    const result_f32 = op_f32.apply();
+    try testing.expectEqual(8.0, result_f32.data);
+    try testing.expectEqual(op_f32, result_f32.op.?.pow);
+
+    var value_i32 = Value(i32).init(2);
+    const op_i32 = Op(i32).Pow{ .base = &value_i32, .exponent = 3 };
+    const result_i32 = op_i32.apply();
+    try testing.expectEqual(8, result_i32.data);
+    try testing.expectEqual(op_i32, result_i32.op.?.pow);
+}
+
+test "pow backward" {
+    var value_f32 = Value(f32).init(2.0);
+    const op_f32 = Op(f32).Pow{ .base = &value_f32, .exponent = 3.0 };
+    var out_f32 = op_f32.apply();
+    out_f32.grad = 2.0;
+    op_f32.backward(&out_f32);
+    try testing.expectEqual(24.0, value_f32.grad); // 3 * 2^2 * 2.0
+
+    var value_i32 = Value(i32).init(2);
+    const op_i32 = Op(i32).Pow{ .base = &value_i32, .exponent = 3 };
+    var out_i32 = op_i32.apply();
+    out_i32.grad = 2;
+    op_i32.backward(&out_i32);
+    try testing.expectEqual(24, value_i32.grad); // 3 * 2^2 * 2
 }

@@ -78,6 +78,17 @@ pub fn Value(comptime T: type) type {
             return op.relu.apply();
         }
 
+        /// Raises this value to the power of the given exponent.
+        pub fn pow(self: *Value(T), exponent: T) Value(T) {
+            const op = Op(T){
+                .pow = .{
+                    .base = self,
+                    .exponent = exponent,
+                },
+            };
+            return op.pow.apply();
+        }
+
         /// Performs backpropagation to compute gradients.
         pub fn backword(self: *Value(T)) std.mem.Allocator.Error!void {
             var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -126,6 +137,9 @@ pub fn Value(comptime T: type) type {
                     },
                     .relu => |relu_op| {
                         try relu_op.value.dfs(visited, stack);
+                    },
+                    .pow => |pow_op| {
+                        try pow_op.base.dfs(visited, stack);
                     },
                 }
                 try stack.append(self);
@@ -184,6 +198,13 @@ test "value relu" {
     var value_f32 = Value(f32).init(-10.0);
     const result_f32 = value_f32.relu();
     try testing.expectEqual(0.0, result_f32.data);
+    try testing.expect(result_f32.op != null);
+}
+
+test "value pow" {
+    var value_f32 = Value(f32).init(2.0);
+    const result_f32 = value_f32.pow(3.0);
+    try testing.expectEqual(8.0, result_f32.data);
     try testing.expect(result_f32.op != null);
 }
 
