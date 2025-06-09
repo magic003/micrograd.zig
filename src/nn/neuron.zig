@@ -1,6 +1,7 @@
 const std = @import("std");
 const Prng = std.Random.DefaultPrng;
 const Allocator = std.mem.Allocator;
+
 const Value = @import("../value.zig").Value;
 
 /// Neuron represents a single neuron in a neural network.
