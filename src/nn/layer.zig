@@ -65,19 +65,13 @@ pub const Layer = struct {
         defer layer.deinit();
 
         // w is randomly generated. Reset them to fixed value for easy testing.
-        var w1 = [_]Value(f32){
-            Value(f32).init(-1.0),
-            Value(f32).init(-0.25),
-            Value(f32).init(0.75),
-        };
-        layer.neurons[0].w = w1[0..];
+        layer.neurons[0].w[0] = Value(f32).init(-1.0);
+        layer.neurons[0].w[1] = Value(f32).init(-0.25);
+        layer.neurons[0].w[2] = Value(f32).init(0.75);
 
-        var w2 = [_]Value(f32){
-            Value(f32).init(0.5),
-            Value(f32).init(-0.5),
-            Value(f32).init(-1.0),
-        };
-        layer.neurons[1].w = w2[0..];
+        layer.neurons[1].w[0] = Value(f32).init(0.5);
+        layer.neurons[1].w[1] = Value(f32).init(-0.5);
+        layer.neurons[1].w[2] = Value(f32).init(-1.0);
 
         var x1 = Value(f32).init(1.0);
         var x2 = Value(f32).init(2.0);

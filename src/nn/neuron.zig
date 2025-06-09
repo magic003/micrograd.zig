@@ -9,12 +9,14 @@ pub const Neuron = struct {
     w: []Value(f32),
     b: Value(f32),
     non_linear: bool = true,
-    arena_allocator: std.heap.ArenaAllocator,
+    products: []Value(f32), // Temporary storage for products during forward pass
+    sums: []Value(f32), // Temporary storage for sums during forward pass
+    z: Value(f32), // Temporary storage for the final output during forward pass
+    allocator: Allocator,
 
     /// Creates a neuron given the input values.
     pub fn init(allocator: Allocator, num_inputs: usize, non_linear: bool) Allocator.Error!Neuron {
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        const w = try arena.allocator().alloc(Value(f32), num_inputs);
+        const w = try allocator.alloc(Value(f32), num_inputs);
         var prng = Prng.init(@intCast(std.time.milliTimestamp()));
         for (w) |*weight| {
             weight.* = Value(f32).init(prng.random().float(f32) * 2.0 - 1.0); // [-1.0, 1.0)
@@ -23,33 +25,33 @@ pub const Neuron = struct {
             .w = w,
             .b = Value(f32).init(0.0),
             .non_linear = non_linear,
-            .arena_allocator = arena,
+            .products = try allocator.alloc(Value(f32), num_inputs),
+            .sums = try allocator.alloc(Value(f32), num_inputs),
+            .z = Value(f32).init(0.0),
+            .allocator = allocator,
         };
     }
 
     /// Deinitializes the neuron and frees its resources.
     pub fn deinit(self: Neuron) void {
-        self.arena_allocator.deinit();
+        self.allocator.free(self.sums);
+        self.allocator.free(self.products);
+        self.allocator.free(self.w);
     }
 
     pub fn forward(self: *Neuron, x: []*Value(f32)) Allocator.Error!Value(f32) {
-        const allocator = self.arena_allocator.allocator();
         // products = [w1 * x1, w2 * x2, ..., wn * xn]
-        const products = try allocator.alloc(Value(f32), self.w.len);
-        for (products, 0..) |*product, i| {
-            product.* = self.w[i].mul(x[i]);
+        for (self.products, self.w, x) |*product, *w, xi| {
+            product.* = w.mul(xi);
         }
         // sum = w1 * x1 + w2 * x2 + ... + wn * xn
-        var sum = &products[0];
-        for (products[1..]) |*p| {
-            const add = try allocator.create(Value(f32));
-            add.* = sum.add(p);
-            sum = add;
+        self.sums[0] = self.products[0];
+        for (self.products[1..], 1..) |*p, i| {
+            self.sums[i] = self.sums[i - 1].add(p);
         }
         // z = sum + b
-        var z = try allocator.create(Value(f32));
-        z.* = sum.add(&self.b);
-        return if (self.non_linear) z.relu() else z.*;
+        self.z = self.sums[self.sums.len - 1].add(&self.b);
+        return if (self.non_linear) self.z.relu() else self.z;
     }
 
     const testing = @import("std").testing;
@@ -75,12 +77,9 @@ pub const Neuron = struct {
         defer neuron.deinit();
 
         // w is randomly generated. Reset them to fixed value for easy testing.
-        var w = [_]Value(f32){
-            Value(f32).init(-1.0),
-            Value(f32).init(-0.25),
-            Value(f32).init(0.75),
-        };
-        neuron.w = w[0..];
+        neuron.w[0] = Value(f32).init(-1.0);
+        neuron.w[1] = Value(f32).init(-0.25);
+        neuron.w[2] = Value(f32).init(0.75);
 
         var x1 = Value(f32).init(1.0);
         var x2 = Value(f32).init(2.0);
@@ -104,11 +103,8 @@ pub const Neuron = struct {
         defer neuron.deinit();
 
         // w is randomly generated. Reset them to fixed value for easy testing.
-        var w = [_]Value(f32){
-            Value(f32).init(-1.0),
-            Value(f32).init(-0.25),
-        };
-        neuron.w = w[0..];
+        neuron.w[0] = Value(f32).init(-1.0);
+        neuron.w[1] = Value(f32).init(-0.25);
 
         var x1 = Value(f32).init(1.0);
         var x2 = Value(f32).init(2.0);
