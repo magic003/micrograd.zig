@@ -70,6 +70,12 @@ pub const MLP = struct {
         return self.layers[self.layers.len - 1].forward(input);
     }
 
+    pub fn zeroGrad(self: *MLP) void {
+        for (self.layers) |*layer| {
+            layer.zeroGrad();
+        }
+    }
+
     const testing = @import("std").testing;
 
     test init {
@@ -123,5 +129,27 @@ pub const MLP = struct {
         try testing.expectEqual(2, outputs.len);
         try testing.expectEqual(0.375, outputs[0].data);
         try testing.expectEqual(0.0, outputs[1].data);
+    }
+
+    test zeroGrad {
+        const allocator = std.testing.allocator;
+        var num_outputs = [_]usize{ 3, 2 };
+        var mlp = try MLP.init(allocator, 2, num_outputs[0..]);
+        defer mlp.deinit();
+
+        // Set some gradients
+        for (mlp.parameters) |p| {
+            p.grad = 1.0;
+        }
+
+        mlp.zeroGrad();
+
+        for (mlp.layers) |layer| {
+            for (layer.neurons) |neuron| {
+                for (neuron.parameters) |param| {
+                    try testing.expectEqual(0.0, param.grad);
+                }
+            }
+        }
     }
 };
