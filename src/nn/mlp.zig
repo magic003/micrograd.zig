@@ -7,6 +7,7 @@ const Value = @import("../value.zig").Value;
 /// MLP represents a Multi-Layer Perceptron (MLP) neural network.
 pub const MLP = struct {
     layers: []Layer,
+    parameters: []*Value(f32),
     allocator: std.mem.Allocator,
 
     pub fn init(
@@ -15,13 +16,28 @@ pub const MLP = struct {
         num_outputs: []usize,
     ) Allocator.Error!MLP {
         const layers = try allocator.alloc(Layer, num_outputs.len);
+        var num_parameter: usize = 0;
         var input = num_input; // Start with the initial input size
         for (num_outputs, layers) |num_output, *layer| {
             layer.* = try Layer.init(allocator, input, num_output, true);
             input = num_output; // Update input size for the next layer
+            num_parameter += layer.parameters.len;
         }
+
+        const parameters = blk: {
+            const result = try allocator.alloc(*Value(f32), num_parameter);
+            var index: usize = 0;
+            for (layers) |layer| {
+                for (layer.parameters) |param| {
+                    result[index] = param;
+                    index += 1;
+                }
+            }
+            break :blk result;
+        };
         return MLP{
             .layers = layers,
+            .parameters = parameters,
             .allocator = allocator,
         };
     }
@@ -30,6 +46,7 @@ pub const MLP = struct {
         for (self.layers) |layer| {
             layer.deinit();
         }
+        self.allocator.free(self.parameters);
         self.allocator.free(self.layers);
     }
 
@@ -68,6 +85,8 @@ pub const MLP = struct {
         try testing.expectEqual(5, mlp.layers[1].neurons.len);
         try testing.expectEqual(mlp.layers[1].neurons.len, mlp.layers[2].neurons[0].w.len);
         try testing.expectEqual(2, mlp.layers[2].neurons.len);
+
+        try testing.expectEqual(53, mlp.parameters.len);
     }
 
     test forward {
