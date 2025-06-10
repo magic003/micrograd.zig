@@ -15,8 +15,8 @@ pub const Neuron = struct {
     allocator: Allocator,
 
     /// Creates a neuron given the input values.
-    pub fn init(allocator: Allocator, num_inputs: usize, non_linear: bool) Allocator.Error!Neuron {
-        const w = try allocator.alloc(Value(f32), num_inputs);
+    pub fn init(allocator: Allocator, num_input: usize, non_linear: bool) Allocator.Error!Neuron {
+        const w = try allocator.alloc(Value(f32), num_input);
         var prng = Prng.init(@intCast(std.time.milliTimestamp()));
         for (w) |*weight| {
             weight.* = Value(f32).init(prng.random().float(f32) * 2.0 - 1.0); // [-1.0, 1.0)
@@ -25,8 +25,8 @@ pub const Neuron = struct {
             .w = w,
             .b = Value(f32).init(0.0),
             .non_linear = non_linear,
-            .products = try allocator.alloc(Value(f32), num_inputs),
-            .sums = try allocator.alloc(Value(f32), num_inputs),
+            .products = try allocator.alloc(Value(f32), num_input),
+            .sums = try allocator.alloc(Value(f32), num_input),
             .z = Value(f32).init(0.0),
             .allocator = allocator,
         };

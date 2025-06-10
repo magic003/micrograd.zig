@@ -13,17 +13,17 @@ pub const Layer = struct {
     /// Creates a new layer with the specified number of inputs and outputs.
     pub fn init(
         allocator: Allocator,
-        num_inputs: usize,
-        num_outputs: usize,
+        num_input: usize,
+        num_output: usize,
         non_linear: bool,
     ) Allocator.Error!Layer {
-        const neurons = try allocator.alloc(Neuron, num_outputs);
+        const neurons = try allocator.alloc(Neuron, num_output);
         for (neurons) |*neuron| {
-            neuron.* = try Neuron.init(allocator, num_inputs, non_linear);
+            neuron.* = try Neuron.init(allocator, num_input, non_linear);
         }
         return Layer{
             .neurons = neurons,
-            .outputs = try allocator.alloc(Value(f32), num_outputs),
+            .outputs = try allocator.alloc(Value(f32), num_output),
             .allocator = allocator,
         };
     }
