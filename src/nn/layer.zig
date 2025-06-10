@@ -51,6 +51,12 @@ pub const Layer = struct {
         return self.outputs;
     }
 
+    pub fn zeroGrad(self: *Layer) void {
+        for (self.neurons) |*neuron| {
+            neuron.zeroGrad();
+        }
+    }
+
     const testing = @import("std").testing;
 
     test init {
@@ -99,5 +105,26 @@ pub const Layer = struct {
         try testing.expectEqual(2, outputs.len);
         try testing.expectEqual(0.75, outputs[0].data); // Neuron 1 output
         try testing.expectEqual(0.0, outputs[1].data); // Neuron 2 output
+    }
+
+    test zeroGrad {
+        const allocator = std.testing.allocator;
+        var layer = try Layer.init(allocator, 3, 2, true);
+        defer layer.deinit();
+
+        // Set some gradients
+        for (layer.parameters) |p| {
+            p.grad = 1.0;
+        }
+
+        // Zero gradients
+        layer.zeroGrad();
+
+        // Check if gradients are zeroed
+        for (layer.neurons) |neuron| {
+            for (neuron.parameters) |param| {
+                try testing.expectEqual(0.0, param.grad);
+            }
+        }
     }
 };
