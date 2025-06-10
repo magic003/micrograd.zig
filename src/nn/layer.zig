@@ -8,6 +8,7 @@ const Value = @import("../value.zig").Value;
 pub const Layer = struct {
     neurons: []Neuron,
     outputs: []Value(f32),
+    parameters: []*Value(f32),
     allocator: Allocator,
 
     /// Creates a new layer with the specified number of inputs and outputs.
@@ -18,12 +19,17 @@ pub const Layer = struct {
         non_linear: bool,
     ) Allocator.Error!Layer {
         const neurons = try allocator.alloc(Neuron, num_output);
-        for (neurons) |*neuron| {
+        const parameters = try allocator.alloc(*Value(f32), (num_input + 1) * num_output);
+        for (neurons, 0..) |*neuron, i| {
             neuron.* = try Neuron.init(allocator, num_input, non_linear);
+            for (neuron.parameters, 0..) |param, j| {
+                parameters[i * (num_input + 1) + j] = param;
+            }
         }
         return Layer{
             .neurons = neurons,
             .outputs = try allocator.alloc(Value(f32), num_output),
+            .parameters = parameters,
             .allocator = allocator,
         };
     }
@@ -33,6 +39,7 @@ pub const Layer = struct {
         for (self.neurons) |neuron| {
             neuron.deinit();
         }
+        self.allocator.free(self.parameters);
         self.allocator.free(self.outputs);
         self.allocator.free(self.neurons);
     }
@@ -57,6 +64,12 @@ pub const Layer = struct {
             try testing.expectEqual(3, neuron.w.len);
             try testing.expectEqual(true, neuron.non_linear);
         }
+
+        try testing.expectEqual(16, layer.parameters.len); // 3 weights + 1 bias for each neuron
+        try testing.expectEqual(&layer.neurons[0].w[0], layer.parameters[0]);
+        try testing.expectEqual(&layer.neurons[0].w[1], layer.parameters[1]);
+        try testing.expectEqual(&layer.neurons[0].w[2], layer.parameters[2]);
+        try testing.expectEqual(layer.neurons[0].b, layer.parameters[3]);
     }
 
     test forward {

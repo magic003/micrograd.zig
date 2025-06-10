@@ -143,4 +143,23 @@ pub const Neuron = struct {
         const output = try neuron.forward(x[0..]);
         try testing.expectEqual(-1.5, output.data);
     }
+
+    test zeroGrad {
+        const allocator = std.testing.allocator;
+        var neuron = try Neuron.init(allocator, 3, true);
+        defer neuron.deinit();
+
+        // Set some gradients
+        for (neuron.parameters) |p| {
+            p.grad = 1.0;
+        }
+
+        // Zero the gradients
+        neuron.zeroGrad();
+
+        // Check that all gradients are zero
+        for (neuron.parameters) |p| {
+            try testing.expectEqual(0.0, p.grad);
+        }
+    }
 };
