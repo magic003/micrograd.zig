@@ -128,3 +128,7 @@ pub const Layer = struct {
         }
     }
 };
+
+test {
+    _ = @import("./layer.zig").Layer;
+}

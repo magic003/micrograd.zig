@@ -153,3 +153,7 @@ pub const MLP = struct {
         }
     }
 };
+
+test {
+    _ = @import("./mlp.zig").MLP;
+}

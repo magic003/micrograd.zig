@@ -163,3 +163,7 @@ pub const Neuron = struct {
         }
     }
 };
+
+test {
+    _ = @import("./neuron.zig").Neuron;
+}
