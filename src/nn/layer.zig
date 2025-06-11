@@ -44,7 +44,7 @@ pub const Layer = struct {
         self.allocator.free(self.neurons);
     }
 
-    pub fn forward(self: *Layer, x: []*Value(f32)) Allocator.Error![]Value(f32) {
+    pub fn forward(self: *Layer, x: []const *Value(f32)) Allocator.Error![]Value(f32) {
         for (self.neurons, self.outputs) |*neuron, *output| {
             output.* = try neuron.forward(x);
         }

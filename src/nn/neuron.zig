@@ -53,7 +53,7 @@ pub const Neuron = struct {
         self.allocator.free(self.w);
     }
 
-    pub fn forward(self: *Neuron, x: []*Value(f32)) Allocator.Error!Value(f32) {
+    pub fn forward(self: *Neuron, x: []const *Value(f32)) Allocator.Error!Value(f32) {
         // products = [w1 * x1, w2 * x2, ..., wn * xn]
         for (self.products, self.w, x) |*product, *w, xi| {
             product.* = w.mul(xi);

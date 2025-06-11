@@ -13,7 +13,7 @@ pub const MLP = struct {
     pub fn init(
         allocator: Allocator,
         num_input: usize,
-        num_outputs: []usize,
+        num_outputs: []const usize,
     ) Allocator.Error!MLP {
         const layers = try allocator.alloc(Layer, num_outputs.len);
         var num_parameter: usize = 0;
@@ -50,7 +50,7 @@ pub const MLP = struct {
         self.allocator.free(self.layers);
     }
 
-    pub fn forward(self: *MLP, x: []*Value(f32)) Allocator.Error![]Value(f32) {
+    pub fn forward(self: *MLP, x: []const *Value(f32)) Allocator.Error![]Value(f32) {
         var input = x;
         var last_output: ?[]*Value(f32) = null;
         for (self.layers[0 .. self.layers.len - 1]) |*layer| {
