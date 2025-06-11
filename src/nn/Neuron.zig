@@ -10,11 +10,9 @@ pub const Neuron = @This();
 w: []Value(f32),
 b: *Value(f32),
 non_linear: bool = true,
-products: []Value(f32), // Temporary storage for products during forward pass
-sums: []Value(f32), // Temporary storage for sums during forward pass
-z: Value(f32), // Temporary storage for the final output during forward pass
 parameters: []*Value(f32),
 allocator: Allocator,
+arena: std.heap.ArenaAllocator,
 
 /// Creates a neuron given the input values.
 pub fn init(allocator: Allocator, num_input: usize, non_linear: bool) Allocator.Error!Neuron {
@@ -37,36 +35,37 @@ pub fn init(allocator: Allocator, num_input: usize, non_linear: bool) Allocator.
         .w = w,
         .b = b,
         .non_linear = non_linear,
-        .products = try allocator.alloc(Value(f32), num_input),
-        .sums = try allocator.alloc(Value(f32), num_input),
-        .z = Value(f32).init(0.0),
         .parameters = parameters,
         .allocator = allocator,
+        .arena = std.heap.ArenaAllocator.init(allocator),
     };
 }
 
 /// Deinitializes the neuron and frees its resources.
 pub fn deinit(self: Neuron) void {
+    self.arena.deinit();
     self.allocator.free(self.parameters);
-    self.allocator.free(self.sums);
-    self.allocator.free(self.products);
     self.allocator.destroy(self.b);
     self.allocator.free(self.w);
 }
 
 pub fn forward(self: *Neuron, x: []const *Value(f32)) Allocator.Error!Value(f32) {
+    const allocator = self.arena.allocator();
+    const products = try allocator.alloc(Value(f32), self.w.len);
     // products = [w1 * x1, w2 * x2, ..., wn * xn]
-    for (self.products, self.w, x) |*product, *w, xi| {
+    for (products, self.w, x) |*product, *w, xi| {
         product.* = w.mul(xi);
     }
+    const sums = try allocator.alloc(Value(f32), self.w.len);
     // sum = w1 * x1 + w2 * x2 + ... + wn * xn
-    self.sums[0] = self.products[0];
-    for (self.products[1..], 1..) |*p, i| {
-        self.sums[i] = self.sums[i - 1].add(p);
+    sums[0] = products[0];
+    for (products[1..], 1..) |*p, i| {
+        sums[i] = sums[i - 1].add(p);
     }
     // z = sum + b
-    self.z = self.sums[self.sums.len - 1].add(self.b);
-    return if (self.non_linear) self.z.relu() else self.z;
+    const z = try allocator.create(Value(f32));
+    z.* = sums[sums.len - 1].add(self.b);
+    return if (self.non_linear) z.relu() else z.*;
 }
 
 pub fn zeroGrad(self: *Neuron) void {
@@ -89,8 +88,6 @@ test init {
         try testing.expectEqual(3, neuron.w.len);
         try testing.expectEqual(0.0, neuron.b.data);
         try testing.expectEqual(true, neuron.non_linear);
-        try testing.expectEqual(3, neuron.products.len);
-        try testing.expectEqual(3, neuron.sums.len);
 
         try testing.expectEqual(4, neuron.parameters.len); // 3 weights + 1 bias
         try testing.expectEqual(&neuron.w[0], neuron.parameters[0]);
