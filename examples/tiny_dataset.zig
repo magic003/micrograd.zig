@@ -19,6 +19,7 @@ pub fn main() !void {
     // const ys = [_]f32{ 1.0, -1.0, -1.0, 1.0 };
 
     var ypred: [4]Vf32 = undefined;
+    var ypred_ptr: [4]*Vf32 = undefined;
     for (&ypred, 0..) |*yp, i| {
         // Forward pass
         var x0 = xs[i][0];
@@ -26,6 +27,7 @@ pub fn main() !void {
         var x2 = xs[i][2];
         const output = try mlp.forward(&.{ &x0, &x1, &x2 });
         yp.* = output[0];
+        ypred_ptr[i] = &output[0];
     }
 
     printValues("Predicted", ypred.len, ypred);
@@ -39,5 +41,5 @@ fn printValues(comptime msg: []const u8, comptime N: usize, values: [N]Vf32) voi
         }
         break :blk arr;
     };
-    std.debug.print("{s}: {d:.10}\n", .{ msg, vs });
+    std.debug.print("{s}: {d:.8}\n", .{ msg, vs });
 }

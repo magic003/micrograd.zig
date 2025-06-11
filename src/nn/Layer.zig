@@ -8,9 +8,9 @@ const Value = @import("../value.zig").Value;
 pub const Layer = @This();
 
 neurons: []Neuron,
-outputs: []Value(f32),
 parameters: []*Value(f32),
 allocator: Allocator,
+arena: std.heap.ArenaAllocator,
 
 /// Creates a new layer with the specified number of inputs and outputs.
 pub fn init(
@@ -29,27 +29,28 @@ pub fn init(
     }
     return Layer{
         .neurons = neurons,
-        .outputs = try allocator.alloc(Value(f32), num_output),
         .parameters = parameters,
         .allocator = allocator,
+        .arena = std.heap.ArenaAllocator.init(allocator),
     };
 }
 
 /// Deinitializes the layer and frees its resources.
 pub fn deinit(self: Layer) void {
+    self.arena.deinit();
     for (self.neurons) |neuron| {
         neuron.deinit();
     }
     self.allocator.free(self.parameters);
-    self.allocator.free(self.outputs);
     self.allocator.free(self.neurons);
 }
 
 pub fn forward(self: *Layer, x: []const *Value(f32)) Allocator.Error![]Value(f32) {
-    for (self.neurons, self.outputs) |*neuron, *output| {
+    const outputs = try self.arena.allocator().alloc(Value(f32), self.neurons.len);
+    for (self.neurons, outputs) |*neuron, *output| {
         output.* = try neuron.forward(x);
     }
-    return self.outputs;
+    return outputs;
 }
 
 pub fn zeroGrad(self: *Layer) void {
@@ -66,7 +67,6 @@ test init {
     defer layer.deinit();
 
     try testing.expectEqual(4, layer.neurons.len);
-    try testing.expectEqual(4, layer.outputs.len);
     for (layer.neurons) |neuron| {
         try testing.expectEqual(3, neuron.w.len);
         try testing.expectEqual(true, neuron.non_linear);
