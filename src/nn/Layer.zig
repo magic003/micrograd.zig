@@ -45,8 +45,8 @@ pub fn deinit(self: Layer) void {
     self.allocator.free(self.neurons);
 }
 
-pub fn forward(self: *Layer, x: []const *Value(f32)) Allocator.Error![]Value(f32) {
-    const outputs = try self.arena.allocator().alloc(Value(f32), self.neurons.len);
+pub fn forward(self: *Layer, x: []const *Value(f32)) Allocator.Error![]*Value(f32) {
+    const outputs = try self.arena.allocator().alloc(*Value(f32), self.neurons.len);
     for (self.neurons, outputs) |*neuron, *output| {
         output.* = try neuron.forward(x);
     }

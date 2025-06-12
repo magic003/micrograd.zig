@@ -51,24 +51,15 @@ pub fn deinit(self: MLP) void {
     self.allocator.free(self.layers);
 }
 
-pub fn forward(self: *MLP, x: []const *Value(f32)) Allocator.Error![]Value(f32) {
+pub fn forward(self: *MLP, x: []const *Value(f32)) Allocator.Error![]*Value(f32) {
     var input = x;
-    var last_output: ?[]*Value(f32) = null;
-    for (self.layers[0 .. self.layers.len - 1]) |*layer| {
-        const output = try layer.forward(input);
-        // free the previous output slice
-        if (last_output) |o| {
-            self.allocator.free(o);
-        }
-        last_output = try self.allocator.alloc(*Value(f32), output.len);
-        for (output, 0..) |*o, i| {
-            last_output.?[i] = o;
-        }
-        input = last_output.?;
+    var output: []*Value(f32) = undefined;
+    for (self.layers) |*layer| {
+        output = try layer.forward(input);
+        input = output;
     }
 
-    defer if (last_output) |o| self.allocator.free(o);
-    return self.layers[self.layers.len - 1].forward(input);
+    return output;
 }
 
 pub fn zeroGrad(self: *MLP) void {

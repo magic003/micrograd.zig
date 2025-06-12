@@ -49,7 +49,7 @@ pub fn deinit(self: Neuron) void {
     self.allocator.free(self.w);
 }
 
-pub fn forward(self: *Neuron, x: []const *Value(f32)) Allocator.Error!Value(f32) {
+pub fn forward(self: *Neuron, x: []const *Value(f32)) Allocator.Error!*Value(f32) {
     const allocator = self.arena.allocator();
     const products = try allocator.alloc(Value(f32), self.w.len);
     // products = [w1 * x1, w2 * x2, ..., wn * xn]
@@ -65,7 +65,13 @@ pub fn forward(self: *Neuron, x: []const *Value(f32)) Allocator.Error!Value(f32)
     // z = sum + b
     const z = try allocator.create(Value(f32));
     z.* = sums[sums.len - 1].add(self.b);
-    return if (self.non_linear) z.relu() else z.*;
+    if (!self.non_linear) {
+        return z;
+    } else {
+        const relu = try allocator.create(Value(f32));
+        relu.* = z.relu();
+        return relu;
+    }
 }
 
 pub fn zeroGrad(self: *Neuron) void {
