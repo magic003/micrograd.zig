@@ -7,7 +7,7 @@ const Value = @import("../value.zig").Value;
 /// MLP represents a Multi-Layer Perceptron (MLP) neural network.
 pub const MLP = @This();
 
-layers: []Layer,
+layers: []*Layer,
 parameters: []*Value(f32),
 allocator: std.mem.Allocator,
 
@@ -16,26 +16,24 @@ pub fn init(
     num_input: usize,
     num_outputs: []const usize,
 ) Allocator.Error!MLP {
-    const layers = try allocator.alloc(Layer, num_outputs.len);
+    const layers = try allocator.alloc(*Layer, num_outputs.len);
     var num_parameter: usize = 0;
     var input = num_input; // Start with the initial input size
-    for (num_outputs, layers) |num_output, *layer| {
-        layer.* = try Layer.init(allocator, input, num_output, true);
+    for (num_outputs, 0..) |num_output, i| {
+        layers[i] = try allocator.create(Layer);
+        layers[i].* = try Layer.init(allocator, input, num_output, true);
         input = num_output; // Update input size for the next layer
-        num_parameter += layer.parameters.len;
+        num_parameter += layers[i].parameters.len;
     }
 
-    const parameters = blk: {
-        const result = try allocator.alloc(*Value(f32), num_parameter);
-        var index: usize = 0;
-        for (layers) |layer| {
-            for (layer.parameters) |param| {
-                result[index] = param;
-                index += 1;
-            }
+    const parameters = try allocator.alloc(*Value(f32), num_parameter);
+    var index: usize = 0;
+    for (layers) |layer| {
+        for (layer.parameters) |param| {
+            parameters[index] = param;
+            index += 1;
         }
-        break :blk result;
-    };
+    }
     return MLP{
         .layers = layers,
         .parameters = parameters,
@@ -46,6 +44,7 @@ pub fn init(
 pub fn deinit(self: MLP) void {
     for (self.layers) |layer| {
         layer.deinit();
+        self.allocator.destroy(layer);
     }
     self.allocator.free(self.parameters);
     self.allocator.free(self.layers);
@@ -54,7 +53,7 @@ pub fn deinit(self: MLP) void {
 pub fn forward(self: *MLP, x: []const *Value(f32)) Allocator.Error![]*Value(f32) {
     var input = x;
     var output: []*Value(f32) = undefined;
-    for (self.layers) |*layer| {
+    for (self.layers) |layer| {
         output = try layer.forward(input);
         input = output;
     }
@@ -63,7 +62,7 @@ pub fn forward(self: *MLP, x: []const *Value(f32)) Allocator.Error![]*Value(f32)
 }
 
 pub fn zeroGrad(self: *MLP) void {
-    for (self.layers) |*layer| {
+    for (self.layers) |layer| {
         layer.zeroGrad();
     }
 }
@@ -95,20 +94,20 @@ test forward {
 
     // w is randomly generated. Reset them to fixed value for easy testing.
     // layer 1
-    mlp.layers[0].neurons[0].w[0] = Value(f32).init(-1.0);
-    mlp.layers[0].neurons[0].w[1] = Value(f32).init(-0.25);
-    mlp.layers[0].neurons[1].w[0] = Value(f32).init(0.5);
-    mlp.layers[0].neurons[1].w[1] = Value(f32).init(-0.5);
-    mlp.layers[0].neurons[2].w[0] = Value(f32).init(0.75);
-    mlp.layers[0].neurons[2].w[1] = Value(f32).init(0.25);
+    mlp.layers[0].neurons[0].w[0].data = -1.0;
+    mlp.layers[0].neurons[0].w[1].data = -0.25;
+    mlp.layers[0].neurons[1].w[0].data = 0.5;
+    mlp.layers[0].neurons[1].w[1].data = -0.5;
+    mlp.layers[0].neurons[2].w[0].data = 0.75;
+    mlp.layers[0].neurons[2].w[1].data = 0.25;
 
     // layer 2
-    mlp.layers[1].neurons[0].w[0] = Value(f32).init(0.1);
-    mlp.layers[1].neurons[0].w[1] = Value(f32).init(-0.2);
-    mlp.layers[1].neurons[0].w[2] = Value(f32).init(0.3);
-    mlp.layers[1].neurons[1].w[0] = Value(f32).init(-0.4);
-    mlp.layers[1].neurons[1].w[1] = Value(f32).init(0.5);
-    mlp.layers[1].neurons[1].w[2] = Value(f32).init(-0.6);
+    mlp.layers[1].neurons[0].w[0].data = 0.1;
+    mlp.layers[1].neurons[0].w[1].data = -0.2;
+    mlp.layers[1].neurons[0].w[2].data = 0.3;
+    mlp.layers[1].neurons[1].w[0].data = -0.4;
+    mlp.layers[1].neurons[1].w[1].data = 0.5;
+    mlp.layers[1].neurons[1].w[2].data = -0.6;
 
     var x1 = Value(f32).init(1.0);
     var x2 = Value(f32).init(2.0);

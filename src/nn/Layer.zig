@@ -7,7 +7,7 @@ const Value = @import("../value.zig").Value;
 /// Layer represents a layer in a neural network, containing multiple neurons.
 pub const Layer = @This();
 
-neurons: []Neuron,
+neurons: []*Neuron,
 parameters: []*Value(f32),
 allocator: Allocator,
 arena: std.heap.ArenaAllocator,
@@ -19,11 +19,12 @@ pub fn init(
     num_output: usize,
     non_linear: bool,
 ) Allocator.Error!Layer {
-    const neurons = try allocator.alloc(Neuron, num_output);
+    const neurons = try allocator.alloc(*Neuron, num_output);
     const parameters = try allocator.alloc(*Value(f32), (num_input + 1) * num_output);
-    for (neurons, 0..) |*neuron, i| {
-        neuron.* = try Neuron.init(allocator, num_input, non_linear);
-        for (neuron.parameters, 0..) |param, j| {
+    for (0..num_output) |i| {
+        neurons[i] = try allocator.create(Neuron);
+        neurons[i].* = try Neuron.init(allocator, num_input, non_linear);
+        for (neurons[i].parameters, 0..) |param, j| {
             parameters[i * (num_input + 1) + j] = param;
         }
     }
@@ -40,6 +41,7 @@ pub fn deinit(self: Layer) void {
     self.arena.deinit();
     for (self.neurons) |neuron| {
         neuron.deinit();
+        self.allocator.destroy(neuron);
     }
     self.allocator.free(self.parameters);
     self.allocator.free(self.neurons);
@@ -47,14 +49,14 @@ pub fn deinit(self: Layer) void {
 
 pub fn forward(self: *Layer, x: []const *Value(f32)) Allocator.Error![]*Value(f32) {
     const outputs = try self.arena.allocator().alloc(*Value(f32), self.neurons.len);
-    for (self.neurons, outputs) |*neuron, *output| {
-        output.* = try neuron.forward(x);
+    for (self.neurons, 0..self.neurons.len) |neuron, i| {
+        outputs[i] = try neuron.forward(x);
     }
     return outputs;
 }
 
 pub fn zeroGrad(self: *Layer) void {
-    for (self.neurons) |*neuron| {
+    for (self.neurons) |neuron| {
         neuron.zeroGrad();
     }
 }
@@ -73,9 +75,9 @@ test init {
     }
 
     try testing.expectEqual(16, layer.parameters.len); // 3 weights + 1 bias for each neuron
-    try testing.expectEqual(&layer.neurons[0].w[0], layer.parameters[0]);
-    try testing.expectEqual(&layer.neurons[0].w[1], layer.parameters[1]);
-    try testing.expectEqual(&layer.neurons[0].w[2], layer.parameters[2]);
+    try testing.expectEqual(layer.neurons[0].w[0], layer.parameters[0]);
+    try testing.expectEqual(layer.neurons[0].w[1], layer.parameters[1]);
+    try testing.expectEqual(layer.neurons[0].w[2], layer.parameters[2]);
     try testing.expectEqual(layer.neurons[0].b, layer.parameters[3]);
 }
 
@@ -85,13 +87,13 @@ test forward {
     defer layer.deinit();
 
     // w is randomly generated. Reset them to fixed value for easy testing.
-    layer.neurons[0].w[0] = Value(f32).init(-1.0);
-    layer.neurons[0].w[1] = Value(f32).init(-0.25);
-    layer.neurons[0].w[2] = Value(f32).init(0.75);
+    layer.neurons[0].w[0].data = -1.0;
+    layer.neurons[0].w[1].data = -0.25;
+    layer.neurons[0].w[2].data = 0.75;
 
-    layer.neurons[1].w[0] = Value(f32).init(0.5);
-    layer.neurons[1].w[1] = Value(f32).init(-0.5);
-    layer.neurons[1].w[2] = Value(f32).init(-1.0);
+    layer.neurons[1].w[0].data = 0.5;
+    layer.neurons[1].w[1].data = -0.5;
+    layer.neurons[1].w[2].data = -1.0;
 
     var x1 = Value(f32).init(1.0);
     var x2 = Value(f32).init(2.0);

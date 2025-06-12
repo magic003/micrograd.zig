@@ -7,7 +7,7 @@ const Value = @import("../value.zig").Value;
 /// Neuron represents a single neuron in a neural network.
 pub const Neuron = @This();
 
-w: []Value(f32),
+w: []*Value(f32),
 b: *Value(f32),
 non_linear: bool = true,
 parameters: []*Value(f32),
@@ -16,7 +16,7 @@ arena: std.heap.ArenaAllocator,
 
 /// Creates a neuron given the input values.
 pub fn init(allocator: Allocator, num_input: usize, non_linear: bool) Allocator.Error!Neuron {
-    const w = try allocator.alloc(Value(f32), num_input);
+    const w = try allocator.alloc(*Value(f32), num_input);
     const b = blk: {
         const bp = try allocator.create(Value(f32));
         bp.* = Value(f32).init(0.0);
@@ -25,9 +25,10 @@ pub fn init(allocator: Allocator, num_input: usize, non_linear: bool) Allocator.
     const parameters = try allocator.alloc(*Value(f32), num_input + 1); // +1 for bias
 
     var prng = Prng.init(@intCast(std.time.milliTimestamp()));
-    for (w, 0..) |*weight, i| {
-        weight.* = Value(f32).init(prng.random().float(f32) * 2.0 - 1.0); // [-1.0, 1.0)
-        parameters[i] = weight;
+    for (0..num_input) |i| {
+        w[i] = try allocator.create(Value(f32));
+        w[i].* = Value(f32).init(prng.random().float(f32) * 2.0 - 1.0); // [-1.0, 1.0)
+        parameters[i] = w[i];
     }
     parameters[parameters.len - 1] = b; // Last parameter is the bias
 
@@ -46,6 +47,9 @@ pub fn deinit(self: Neuron) void {
     self.arena.deinit();
     self.allocator.free(self.parameters);
     self.allocator.destroy(self.b);
+    for (self.w) |weight| {
+        self.allocator.destroy(weight);
+    }
     self.allocator.free(self.w);
 }
 
@@ -53,7 +57,7 @@ pub fn forward(self: *Neuron, x: []const *Value(f32)) Allocator.Error!*Value(f32
     const allocator = self.arena.allocator();
     const products = try allocator.alloc(Value(f32), self.w.len);
     // products = [w1 * x1, w2 * x2, ..., wn * xn]
-    for (products, self.w, x) |*product, *w, xi| {
+    for (products, self.w, x) |*product, w, xi| {
         product.* = w.mul(xi);
     }
     const sums = try allocator.alloc(Value(f32), self.w.len);
@@ -96,9 +100,9 @@ test init {
         try testing.expectEqual(true, neuron.non_linear);
 
         try testing.expectEqual(4, neuron.parameters.len); // 3 weights + 1 bias
-        try testing.expectEqual(&neuron.w[0], neuron.parameters[0]);
-        try testing.expectEqual(&neuron.w[1], neuron.parameters[1]);
-        try testing.expectEqual(&neuron.w[2], neuron.parameters[2]);
+        try testing.expectEqual(neuron.w[0], neuron.parameters[0]);
+        try testing.expectEqual(neuron.w[1], neuron.parameters[1]);
+        try testing.expectEqual(neuron.w[2], neuron.parameters[2]);
         try testing.expectEqual(neuron.b, neuron.parameters[3]);
     }
 }
@@ -109,9 +113,9 @@ test forward {
     defer neuron.deinit();
 
     // w is randomly generated. Reset them to fixed value for easy testing.
-    neuron.w[0] = Value(f32).init(-1.0);
-    neuron.w[1] = Value(f32).init(-0.25);
-    neuron.w[2] = Value(f32).init(0.75);
+    neuron.w[0].data = -1.0;
+    neuron.w[1].data = -0.25;
+    neuron.w[2].data = 0.75;
 
     var x1 = Value(f32).init(1.0);
     var x2 = Value(f32).init(2.0);
@@ -135,8 +139,8 @@ test "foward without non_linear" {
     defer neuron.deinit();
 
     // w is randomly generated. Reset them to fixed value for easy testing.
-    neuron.w[0] = Value(f32).init(-1.0);
-    neuron.w[1] = Value(f32).init(-0.25);
+    neuron.w[0].data = -1.0;
+    neuron.w[1].data = -0.25;
 
     var x1 = Value(f32).init(1.0);
     var x2 = Value(f32).init(2.0);
